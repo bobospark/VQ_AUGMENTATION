@@ -20,9 +20,10 @@ import torch
 import numpy as np
 from dataset_processor import processors_mapping, num_labels_mapping, output_modes_mapping, compute_metrics_mapping  #  median_mapping
 # from tokenizing import Set_Dataset_to_Token
+from torch.utils.data.dataloader import DataLoader
 
-def sum_text(texts1, texts2, self):
-    full_text = np.array(texts1,dtype=object) + np.array([self.tokenizer.sep_token for _ in range(len(texts1))])+np.array(texts2,dtype=object)
+def sum_text(texts1, texts2, sep_token):
+    full_text = np.array(texts1,dtype=object) + np.array([sep_token for _ in range(len(texts1))])+np.array(texts2,dtype=object)
 
     return list(full_text)
 
@@ -61,31 +62,30 @@ class _Set_Dataset_to_Token():
         self.datasets = datasets
         features = [i for i in self.datasets.keys()]
 
+        # if args.dataset not in ['qqp', 'mnli', 'mnli-mm'] or train_eval not in  ['val_test', 'test']:
         if len(features) == 3:#  sst2, cola # args.dataset == 'sst2' or args.dataset == 'cola':
             linetext, label, idx =  self.datasets[features[0]], self.datasets[features[1]] ,self.datasets[features[2]]
-            encoding = self.tokenizer(linetext, 
+            encodings = self.tokenizer(linetext, 
                                     add_special_tokens=True, 
                                     padding= 'max_length',  # 'max_length'
                                     max_length= args.max_seq_length,  # args.max_seq_length
                                     truncation=True,
                                     return_attention_mask=True, 
                                     return_tensors='pt')  # 왜인지 encoded_plus를 쓰면 버그뜸...
-            args.max_seq_length = encoding['input_ids'].shape[1]
             
         if len(features)==4: # mrpc, qqp, mnli(class 3), qnli, rte, wnli   #args.dataset == 'mrpc' or args.dataset == 'qqp' or args.dataset == 'rte' or args.dataset == 'wnli':
             linetext1, linetext2, label, idx =  self.datasets[features[0]], self.datasets[features[1]], self.datasets[features[2]] ,self.datasets[features[3]]
-            linetext = sum_text(linetext1, linetext2, self)
+            linetext = sum_text(linetext1, linetext2, self.tokenizer.sep_token)
             
-            encoding = self.tokenizer(linetext, 
+            encodings = self.tokenizer(linetext, 
                                     add_special_tokens=True, 
                                     padding= 'max_length',  # 'max_length'
                                     max_length= args.max_seq_length,  # args.max_seq_length
                                     truncation=True,
                                     return_attention_mask=True, 
                                     return_tensors='pt')
-            args.max_seq_length = encoding['input_ids'].shape[1]
 
-        self.data = _Make_pair(args, encoding, labels = label)
+        self.data = _Make_pair(args, encodings, labels = label)
 
         return self.data, linetext
 
@@ -106,6 +106,7 @@ class Few_Shot(Dataset):
         self.load_data = _Set_Dataset_to_Token(args)  # test_dataset2 -> Mydataset
 
         # Set dataset
+
         data_file_path = '%s/%s_dataset.pkl'%(args.data_path, args.dataset)
         with open(data_file_path, "rb") as f:
             self.dataset = pickle.load(f)
@@ -115,16 +116,32 @@ class Few_Shot(Dataset):
     def forward(self, args, train_eval = None):
         random.seed(args.seed)
 
-        if train_eval == 'validation' or train_eval == 'val_test':
-            self.train_eval = 'validation'
-        else:
-            self.train_eval = train_eval
+        if args.dataset not in ['mnli', 'mnli-mm']:
+            if train_eval == 'validation' or train_eval == 'val_test':
+                self.train_eval = 'validation'
+            else:
+                self.train_eval = train_eval
+        if args.dataset in ['mnli', 'mnli-mm']:
+            if args.dataset == 'mnli':
+                if train_eval == 'train':
+                    self.train_eval = 'train'
+                if train_eval == 'validation' or train_eval == 'val_test':
+                    self.train_eval = 'validation_matched'
+                if train_eval == 'test':
+                    self.train_eval = 'test_matched'
+            if args.dataset == 'mnli-mm':
+                if train_eval == 'train':
+                    self.train_eval = 'train'
+                if train_eval == 'validation' or train_eval == 'val_test':
+                    self.train_eval = 'validation_mismatched'
+                if train_eval == 'test':
+                    self.train_eval = 'test_mismatched'
 
         self.data = self.dataset[self.train_eval]  # train_eval =[ 'train', 'validation', 'test']
 
         args.num_classes = len(self.processor.get_labels())
 
-        classes = self.processor.get_labels()
+        classes = list(range(args.num_classes))
 
         break_point = 0
         tensor_index = {}
@@ -132,11 +149,11 @@ class Few_Shot(Dataset):
         for class_ in classes:
             tensor_index[class_] = []
 
-        if self.train_eval != 'test':
+        if self.train_eval not in ['test', 'test_matched', 'test_mismatched']:
             while True:
                 value = randint(0, self.data.num_rows - 1)
                 for class_ in classes:
-                    if str(self.data[value]['label']) == class_:
+                    if self.data[value]['label'] == class_:
                         if value not in tensor_index[class_]:
                             if len(tensor_index[class_]) < args.num_shots:
                                 tensor_index[class_].append(value)
@@ -159,31 +176,17 @@ class Few_Shot(Dataset):
                 val_test_idx = [i for i in list(range(len(self.data)-1)) if i not in tensor_index_total]
                 self.few_shot_data = self.data[val_test_idx]
 
-        if train_eval == 'test':
+        if train_eval in ['test', 'test_matched', 'test_mismatched']:
             self.few_shot_data = self.data[:]
             tensor_index_total = self.data['idx']
-            # pass
-
-        # self.few_shot_data_ = self.processor._create_examples(self.few_shot_data)
  
-        self.data_encoded, self.text = self.load_data.forward(args, datasets = self.few_shot_data)
+        self.data_encoded, self.text = self.load_data.forward(args, datasets = self.few_shot_data)  # , self.train_eval
 
         temp_tensor = []
 
-        # if train_eval == 'test':
-        #     test_idx = [i for i in list(range(len(self.data)-1)) if i not in tensor_index_total]
-        #     for i in range(len(test_idx)):
-        #         temp_tensor.append(({'input_ids':self.data[test_idx[i]][0]['input_ids'], 'attention_mask':self.data[test_idx[i]][0]['attention_mask']},self.data[test_idx[i]][1]))
-
-        #     return temp_tensor, test_idx, classes
-        # if train_eval != 'test':
         for i in range(len(self.data_encoded)):
             temp_tensor.append(({'input_ids':self.data_encoded[i][0]['input_ids'], 'attention_mask':self.data_encoded[i][0]['attention_mask']},self.data_encoded[i][1]))
         
-        # if train_eval == 'test':
-        #     for i in range(len(self.data_encoded)-1):
-        #         temp_tensor.append(({'input_ids':self.data_encoded[i][0]['input_ids'], 'attention_mask':self.data_encoded[i][0]['attention_mask']},self.data_encoded[i][1]))
-
         return temp_tensor, tensor_index_total, classes
 
 

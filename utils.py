@@ -86,70 +86,68 @@ class EarlyStopping:
 
 def greedy_search(greedy_or_not, args, model_name, model):
     num_of_training = 0
-    datasets = ['cola', 'sst-2', 'qqp', 'mrpc']  # 'mnli', 'mnli-mm', 'qnli', 'rte', 'wnli', 
-
-    seeds = [13, 21, 42, 87, 100]
-    num_codebook_vectors = [512, 1024, 2048]
-    vq_lrs = [1e-5, 2e-5, 5e-5]
+    seeds = [42]  # 13, 21, , 87, 100
+    num_codebook_vectors = [4096, 2048, 1024,]  # 512, 
+    vq_lrs = [5e-5 , 2e-5]  # ,1e-4
 
     if model_name == 'VQ_run':
         if greedy_or_not:
-            for dataset in datasets:
-                for seed in seeds:
+            for seed in seeds:
+                for vq_lr in vq_lrs:
                     for num_codebook_vector in num_codebook_vectors:
-                        for vq_lr in vq_lrs:
-                            num_of_training += 1
-                            args.dataset = dataset
-                            args.seed = seed
-                            args.num_codebook_vectors = num_codebook_vector
-                            args.vq_lr = vq_lr
-                            print(num_of_training, '/', len(datasets)*len(seeds)*len(num_codebook_vectors)*len(vq_lrs))
-                            model(args)
+                        num_of_training += 1
+                        # args.dataset = dataset
+                        args.seed = seed
+                        args.num_codebook_vectors = num_codebook_vector
+                        args.vq_lr = vq_lr
+                        print(num_of_training, '/', len(seeds)*len(num_codebook_vectors)*len(vq_lrs))  # len(datasets)*
+                        model(args)
         if not greedy_or_not:
             model(args)
 
     if model_name == 'Finetuning_RoBERTa':
-        augments = [True,False]  # True
+        seeds = [13, 21, 42, 87, 100]  # 
+        datasets = ['cola','sst-2', 'mrpc', 'qnli', 'rte', 'wnli','mnli',  'mnli-mm','qqp' ,]  #  
+        # augments = [True,False]  # True/
         if greedy_or_not:
-            epochs = [150, 200]
-            lrs = [1e-5, 2e-5, 5e-5]
-            for augment in augments:
-                args.data_augmentation = augment
-                if args.data_augmentation:
-                    for epoch in epochs:
-                        for dataset in datasets:  # 2개
-                            for seed in seeds:  # 5개
-                                for lr in lrs:  # 3개
-                                    for vq_lr in vq_lrs:  # 3개
-                                        for num_codebook_vector_ in num_codebook_vectors: # 3개
-
-                                            num_of_training+=1
-                                            args.epochs = epoch
-                                            args.dataset = dataset                                            
-                                            args.seed = seed  # [13, 21, 42, 87, 100]
-                                            args.lr = lr  # [1e-5, 2e-5,5e-5]
-                                            args.vq_lr = vq_lr  # [1e-5, 2e-5, 5e-5]
-                                            args.num_codebook_vectors = num_codebook_vector_  # [512, 1024, 2048]
-                                            args.vq_model_path = f'cache_VQ_model/cache_for_{args.dataset}_renewal' 
-                                            print(dataset, num_of_training, '/', len(num_codebook_vectors)*len(vq_lr)*len(lr)*len(seed))
-                                            model(args)
-
-                if not args.data_augmentation:
-                    print('data augmentation False')
-                    i = 0
-                    for epoch in epochs:  # 2개
-                        for dataset in datasets:  
-                            for seed in seeds:  # 5개
-                                for lr in lrs:  # 3개
-                                    i+=1
-                                    args.epochs = epoch
-                                    args.dataset = dataset
-                                    args.seed = seed
-                                    args.lr = lr
-                                    print(dataset, num_of_training, '/', len(seed)*len(lrs))
+            lrs = [1e-5, 2e-5,5e-5]  #  5e-5 has the low performance. Deletion candidate
+            # for augment in augments:
+                # args.data_augmentation = augment
+            if args.data_augmentation:
+            # for epoch in epochs:
+                print('VQ-Augmentation Finetuing')
+                for dataset in datasets:  # 9개
+                    for lr in lrs:  # 3개
+                        for vq_lr in vq_lrs:  # 2개
+                            for num_codebook_vector_ in num_codebook_vectors: # 3개
+                                for seed in seeds:  # 5개
+                                    num_of_training+=1
+                                    # args.epochs = epoch
+                                    args.dataset = dataset                                            
+                                    args.seed = seed  # [13, 21, 42, 87, 100]
+                                    args.lr = lr  # [1e-5, 2e-5,5e-5]
+                                    args.vq_lr = vq_lr  # [1e-5, 2e-5, 5e-5]
+                                    args.num_codebook_vectors = num_codebook_vector_  # [512, 1024, 2048]
+                                    # args.vq_model_path = f'cache_VQ_model/cache_for_{args.dataset}_renewal' 
+                                    print(dataset, num_of_training, '/', len(num_codebook_vectors)*len(vq_lrs)*len(lrs)*len(seeds))
                                     model(args)
-        
+
+            if not args.data_augmentation:
+                print('Conventional Finetuing')
+                # for epoch in epochs:  # 2개
+                for dataset in datasets:  # 
+                    for lr in lrs:  # 3개
+                        for seed in seeds:  # 5개
+                    
+                            num_of_training+=1
+                            # args.epochs = epoch
+                            args.dataset = dataset
+                            args.seed = seed
+                            args.lr = lr
+                            print(dataset, num_of_training, '/', len(seeds)*len(lrs))
+                            model(args)
+            
         if not greedy_or_not:
-            for augment in augments:
-                args.data_augmentation = augment
-                model(args)
+            # for augment in augments:
+                # args.data_augmentation = augment
+            model(args)
