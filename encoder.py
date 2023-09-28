@@ -32,7 +32,7 @@ class Encoder(nn.Module):
         self.model = nn.Sequential(*layers) #.to(device = args.device)
                 
                 
-    def forward(self, x, labels):
+    def forward(self, x):
         # print(x.size())
         # encoded_input = torch.cat((self.label_emb(labels), x), -1)  # 말썽투성이
         encoded_input = x  #.reshape(x.shape[0], -1)  # (batch_size, 1024, 1, 1) -> (batch_size, 1024)

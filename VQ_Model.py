@@ -22,9 +22,9 @@ class VQAugmentation(nn.Module):
         self.quant = nn.Embedding(args.latent_dim, 1).to(device = args.device)  # 이거랑 밑에꺼의 의미를 모르겠음
         self.post_quant = nn.Embedding(args.latent_dim, 1).to(device = args.device)
             
-    def forward(self, embedded_data = None, labels = None):  #  attention_mask = None, labels = None
+    def forward(self, embedded_data = None):  #  attention_mask = None, labels = None
 
-        encoded_text = self.encoder(embedded_data, labels)
+        encoded_text = self.encoder(embedded_data)
         codebook_mapping, codebook_indices, q_loss = self.codebook(encoded_text)
         decoded_text = self.decoder(codebook_mapping)
 
