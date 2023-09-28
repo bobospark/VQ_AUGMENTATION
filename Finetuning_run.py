@@ -52,12 +52,12 @@ class Test_training(nn.Module):
         args.num_classes = num_labels_mapping[args.dataset]
         
 
-        if args.num_classes == 2 :
+        # if args.num_classes == 2 :
             # Define the path to the saved model file
-            model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
-        if args.num_classes == 3 :
-            # Define the path to the saved model file
-            model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
+        model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
+        # if args.num_classes == 3 :
+        #     # Define the path to the saved model file
+        #     model_file_path = '%s/%s-mnli.pkl'%(args.model_path, args.model_name)
         
             # Load the model from the file using pickle
         with open(model_file_path, "rb") as f:
@@ -121,9 +121,9 @@ class Test_training(nn.Module):
                     # set the wandb project where this run will be logged
                     # 1. Conventional Few-shot Classification
                     # 2. VQ-Augmentation-Classification
-                    project=  f"VQ-{args.dataset}-Finetuning-renewal-ver2",  # epochs-{args.epochs}
+                    project=  f"VQ-mixture-{args.dataset}-Finetuning-renewal-rate-{args.rate_of_real}",  # epochs-{args.epochs}
                     entity = "bobos_park",
-                    name = f'{args.model_name}_{args.dataset}_main-lr_{args.lr}_vq-lr_{args.vq_lr}_codebook_{args.num_codebook_vectors}_seed_{args.seed}',  # _epochs_{args.epochs}
+                    name = f'{args.model_name}_main-lr_{args.lr}_vq-lr_{args.vq_lr}_codebook_{args.num_codebook_vectors}_rate_{args.rate_of_real}_seed_{args.seed}',  # _epochs_{args.epochs}
                     reinit=True
                     # track hyperparameters and run metadata
                 )
@@ -134,6 +134,7 @@ class Test_training(nn.Module):
                 "learning_rate": args.lr,
                 "vq-learning_rate": args.vq_lr,
                 "num_codebook_vectors": args.num_codebook_vectors,
+                "rate of real" : args.rate_of_real,
                 "seed": args.seed,
                 }
             else:
@@ -141,9 +142,9 @@ class Test_training(nn.Module):
                     # set the wandb project where this run will be logged
                     # 1. Conventional Few-shot Classification
                     # 2. VQ-Augmentation-Classification
-                    project=  f"RoBERTa-Conventional-Classification-{args.dataset}-renewal-epochs_{args.epochs}",  # 
+                    project=  f"RoBERTa-Conventional-Classification-{args.dataset}-renewal-ver3",  #  #  
                     entity = "bobos_park",
-                    name = f'{args.model_name}_{args.dataset}_lr_{args.lr}_seed_{args.seed}_epochs_{args.epochs}',
+                    name = f'{args.model_name}_{args.dataset}_lr_{args.lr}_seed_{args.seed}',
                     reinit=True
                     # track hyperparameters and run metadata
                 )
@@ -152,8 +153,6 @@ class Test_training(nn.Module):
                 "dataset": args.dataset,
                 "epochs": args.epochs,
                 "learning_rate": args.lr,
-                "vq-learning_rate": args.vq_lr,
-                "num_codebook_vectors": args.num_codebook_vectors,
                 "seed": args.seed,
                 }
 
@@ -163,6 +162,8 @@ class Test_training(nn.Module):
 
         set_seed(args.seed)
         
+
+        # Training Start
         best_val_loss = 10000.0
         best_eval_acc = 0.0
         for epoch in range(args.epochs):
@@ -275,7 +276,6 @@ class Test_training(nn.Module):
             test_preds = []
             test_idx = []
 
-            # if args.dataset in  ['qqp', 'mnli','mnli-mm']:
             test_iter = int(self.testset_split.test_length/args.val_test_batch) + 1
             with tqdm(range(test_iter)) as pbar:
                 for i in range(test_iter):
@@ -291,6 +291,8 @@ class Test_training(nn.Module):
                     print(len(test_preds))
 
             testset(args, test_preds)
+
+
 
 
 if __name__ == '__main__':
@@ -319,6 +321,7 @@ if __name__ == '__main__':
     parser.add_argument("--num-shots", type=int, default=16, help="number of shots per class 16")  # train에서 data 종류 확인한 후 설정
     parser.add_argument("--text-shape", type=int, default=1024, help="1024 | 2048 | 4096") # train에서 data 종류 확인한 후 설정
     parser.add_argument('--num-labels', type = int, default = 2, help = 'number of classification (sst-2 : 2)')
+    parser.add_argument('--rate-of-real', type = float, default = 0.0, help = 'mixture rate of the real data, (1-rate is fake rate)')
     parser.add_argument("--max-seq-length", type=int, default=128, help="128 | 256 | 512")
 
     parser.add_argument("--patience", type=int, default= 100, help="patience for early stopping")
@@ -334,8 +337,8 @@ if __name__ == '__main__':
     parser.add_argument('--data-path', type = str, default = f'{os.getcwd()}/task_dataset', help = 'data path [data_file | data_file]')
 
     parser.add_argument('--save-model', type = str, default = f'{os.getcwd()}/checkpoint_roberta_model', help = 'save model path [model_file | model_file]')
-    parser.add_argument('--save-test-result', type = str, default = f'{os.getcwd()}/test_result_ver2', help = 'save model path [model_file | model_file]')
-    parser.add_argument('--save-conventional-test-result', type = str, default = f'{os.getcwd()}/test_convention_result', help = 'save model path [model_file | model_file]')
+    parser.add_argument('--save-test-result', type = str, default = f'{os.getcwd()}/test_result_ver3', help = 'save model path [model_file | model_file]')
+    parser.add_argument('--save-conventional-test-result', type = str, default = f'{os.getcwd()}/test_convention_result_ver3', help = 'save model path [model_file | model_file]')
     
     args = parser.parse_args()
 

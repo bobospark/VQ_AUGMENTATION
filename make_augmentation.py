@@ -6,7 +6,7 @@
 import torch
 import torch.nn as nn
 import pickle
-
+import os
 
 from Few_Shot_data import Few_Shot
 
@@ -40,9 +40,17 @@ class MakeAugmentation(nn.Module):
         samples, indexes, classes = dataset.forward(args, train_eval = train_eval)
         
         # index 리스트를 파일에 저장
-        # index_file_path = 'cache_index/seed_%s_indexes.pkl'%(args.seed)
-        # with open(index_file_path , 'wb') as f:
-        #     pickle.dump(indexes, f)
+        if train_eval == 'train':
+            if not os.path.exists('/workspace/cache_index'):
+                os.mkdir('/workspace/cache_index')
+
+            index_file_path = f'cache_index/{args.dataset}_seed_{args.seed}_indexes.pkl'
+
+            with open(index_file_path , 'wb') as f:
+                pickle.dump(indexes, f)
+
+        ##### Make Train data set to Embedding #####
+
         self.embeddings = []
         self.attention_mask_ = []
         self.labels = []
@@ -60,10 +68,8 @@ class MakeAugmentation(nn.Module):
             self.attention_mask_.append(torch.tensor(attention_mask).long())
             self.labels.append(torch.tensor(label).long())
                 
-        ##### 여기까지가 Train data set Embedding으로 만드는 부분 #####
 
-
-        ##### 여기서부터는 Train Augmentation data set 만드는 부분 #####
+        ##### Make Train Augmentation data set #####
 
         if train_eval == 'train':  # eval의 경우 Augmetation이 필요 없으므로 Pass
             if args.data_augmentation :
@@ -84,7 +90,8 @@ class MakeAugmentation(nn.Module):
                             decoded_text = self.model_vq(text, label)[0]  # min_encoding_indices와 q_lossㄴ는 빼고 뽑음
                             decoded_sentence.append(decoded_text)
                         augmented_data = torch.cat(decoded_sentence, dim = 0) # [67, 1024]
-                        total_augmented_data.append(augmented_data)
+                        augmented_data_mixture = embs*args.rate_of_real + augmented_data*(1 - args.rate_of_real)
+                        total_augmented_data.append(augmented_data_mixture)
 
                 total_augmented_data_set = torch.cat(total_augmented_data, dim = 0).reshape(len(total_augmented_data), args.max_seq_length, args.text_shape)
                 self.embeddings = torch.cat(self.embeddings, dim = 0).reshape(len(self.embeddings), args.max_seq_length, args.text_shape).to(device = args.device)
