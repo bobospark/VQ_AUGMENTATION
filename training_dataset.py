@@ -16,9 +16,10 @@ class make_roberta_dataset(Dataset):
         self.train_eval = train_eval
 
         if train_eval == 'train':
-            real_embedding, fake_embedding, attention_mask, labels  = self.load_data.forward(args, train_eval = self.train_eval)
+            real_embedding, fake_embedding, attention_mask, labels = self.load_data.forward(args, train_eval = self.train_eval)
         else:  
             real_embedding, _ ,attention_mask, labels  = self.load_data.forward(args, train_eval = self.train_eval)
+            # make_roberta_dataset.indexes = indexes
 
         if args.data_augmentation :
             if self.train_eval == 'train':
@@ -48,7 +49,7 @@ class make_roberta_dataset(Dataset):
         else:
             if self.train_eval == 'train':
                 print('Only Real(Train)')
-            if self.train_eval == 'val':
+            if self.train_eval == 'validation':
                 print('Only Real(Validation)')
             if self.train_eval == 'val_test':
                 print('Only Real(Validation_Test)')

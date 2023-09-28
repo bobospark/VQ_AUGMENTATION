@@ -18,23 +18,20 @@ class MakeAugmentation(nn.Module):
         super(MakeAugmentation, self).__init__()
         self.args = args
         torch.manual_seed(args.seed)
-        if args.num_classes == 2:
-            # Define the path to the saved model file
-            roberta_model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
 
-            # Load the model from the file using pickle
-            with open(roberta_model_file_path, "rb") as f:
-                self.model_roberta = pickle.load(f).to(device = args.device)
+        # Define the path to the saved model file
+        roberta_model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
+
+        # Load the model from the file using pickle
+        with open(roberta_model_file_path, "rb") as f:
+            self.model_roberta = pickle.load(f).to(device = args.device)
         
-        #  'mrpc', 'qqp', 'stsb', 'mnli', 'qnli', 'rte', 'wnli', 'ax'
+        #  'mrpc', 'qqp', 'stsb', 'mnli', 'mnli-mm', 'qnli', 'rte', 'wnli', 
         if args.data_augmentation :
-            vq_model_file_path = '%s/%s_%s_%s_%s_%s.pkl'%(args.vq_model_path, args.model_name, args.dataset, args.vq_lr, args.num_codebook_vectors, args.seed)
-            # vq_model_file_path = '%s/%s_%s_%s_%s_%s_1.pkl'%(args.vq_model_path, args.model_name, args.dataset, args.vq_lr, args.num_codebook_vectors, args.seed)
+            vq_model_file_path = '%s/%s_%s_%s.pkl'%(args.vq_model_path, args.model_name, args.vq_lr, args.num_codebook_vectors)
 
             with open(vq_model_file_path, "rb") as f:
                 self.model_vq = pickle.load(f).to(device = args.device)
-
-
 
     def forward(self, args, train_eval = None, ):  # num_classes = None, num_shots = None
 
@@ -42,7 +39,7 @@ class MakeAugmentation(nn.Module):
 
         samples, indexes, classes = dataset.forward(args, train_eval = train_eval)
         
-        # 리스트를 파일에 저장
+        # index 리스트를 파일에 저장
         # index_file_path = 'cache_index/seed_%s_indexes.pkl'%(args.seed)
         # with open(index_file_path , 'wb') as f:
         #     pickle.dump(indexes, f)
@@ -109,10 +106,4 @@ class MakeAugmentation(nn.Module):
             self.attention_mask = torch.cat(self.attention_mask_, dim = 0).reshape(len(self.embeddings), args.max_seq_length).to(device = args.device)
             _ = []
             return self.embeddings, _, self.attention_mask ,self.labels
-        
-        # if train_eval is not 'val_test':  # For Test Cell
-        #     self.embeddings = torch.cat(self.embeddings, dim = 0).reshape(len(self.embeddings), args.max_seq_length, args.text_shape).to(device = args.device)  # 67은 max_length로 바꿔야함 
-        #     self.attention_mask = torch.cat(self.attention_mask_, dim = 0).reshape(len(self.embeddings), args.max_seq_length).to(device = args.device)
-        #     _ = []
-        #     return self.embeddings, _, self.attention_mask ,self.labels
         
