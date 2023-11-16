@@ -25,7 +25,7 @@ from utils import EarlyStopping
 from torch.utils.data import DataLoader
 
 from make_augmentation import MakeAugmentation
-from training_dataset import make_roberta_dataset
+from training_dataset import make_dataset
 from test_dataset_split import Testset_split, val_test_dataset
 # from Few_Shot_data import Few_Shot
 
@@ -40,8 +40,6 @@ import pickle
 import torch.nn as nn
 import numpy as np
 
-from dataset_processor import num_labels_mapping
-
 # os.environ['CUDA_VISIBLE_DEVICE'] = '3'
 from utils import seed_everything, greedy_search
 
@@ -50,16 +48,8 @@ class Test_training(nn.Module):
         super(Test_training, self).__init__()
 
         args.num_classes = num_labels_mapping[args.dataset]
-        
-
-        # if args.num_classes == 2 :
-            # Define the path to the saved model file
         model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
-        # if args.num_classes == 3 :
-        #     # Define the path to the saved model file
-        #     model_file_path = '%s/%s-mnli.pkl'%(args.model_path, args.model_name)
-        
-            # Load the model from the file using pickle
+
         with open(model_file_path, "rb") as f:
             self.model = pickle.load(f).to(device = args.device)
 
@@ -76,8 +66,6 @@ class Test_training(nn.Module):
                                                          num_training_steps = int((args.num_shots * args.num_classes * 2)/args.batch_size)*args.epochs)
         # self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optim, max_lr = args.lr, steps_per_epoch = int((args.num_shots * args.num_classes * 2)/args.batch_size), epochs = args.epochs)
         self.testset_split = Testset_split(args)
-
-        early_stopping = EarlyStopping(patience=5)
 
         self.score = compute_metrics_mapping[args.dataset]
 
@@ -101,11 +89,11 @@ class Test_training(nn.Module):
         print('seed 고정')
         seed_everything(args)
         print('Embedding starts')
-        train_set = make_roberta_dataset(args, train_eval = 'train')
+        train_set = make_dataset(args, train_eval = 'train')
         train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,)  
         
-        eval_set = make_roberta_dataset(args, train_eval = 'validation')
-        # eval_index = make_roberta_dataset.indexes
+        eval_set = make_dataset(args, train_eval = 'validation')
+        # eval_index = make_dataset.indexes
         eval_loader = DataLoader(eval_set, batch_size=args.batch_size, shuffle=True,)
         
         checkpoint = os.path.join(args.save_model, f'{args.model_name}_{args.dataset}_seed_{args.seed}.pt')
@@ -121,9 +109,9 @@ class Test_training(nn.Module):
                     # set the wandb project where this run will be logged
                     # 1. Conventional Few-shot Classification
                     # 2. VQ-Augmentation-Classification
-                    project=  f"VQ-mixture-{args.dataset}-Finetuning-renewal-rate-{args.rate_of_real}",  # epochs-{args.epochs}
+                    project=  f"VQ-mixture-{args.model_name}-{args.dataset}-rate-{args.rate_of_real}-batch-size-{args.batch_size}",  # epochs-{args.epochs}
                     entity = "bobos_park",
-                    name = f'{args.model_name}_main-lr_{args.lr}_vq-lr_{args.vq_lr}_codebook_{args.num_codebook_vectors}_rate_{args.rate_of_real}_seed_{args.seed}',  # _epochs_{args.epochs}
+                    name = f'{args.model_name}_main-lr_{args.lr}_vq-lr_{args.vq_lr}_codebook_{args.num_codebook_vectors}_rate_{args.rate_of_real}_batch_{args.batch_size}_seed_{args.seed}',  # _epochs_{args.epochs}
                     reinit=True
                     # track hyperparameters and run metadata
                 )
@@ -142,7 +130,7 @@ class Test_training(nn.Module):
                     # set the wandb project where this run will be logged
                     # 1. Conventional Few-shot Classification
                     # 2. VQ-Augmentation-Classification
-                    project=  f"RoBERTa-Conventional-Classification-{args.dataset}-renewal-ver3",  #  #  
+                    project=  f"{args.model_name}-Conventional-{args.dataset}-batch-{args.batch_size}",  #  #  
                     entity = "bobos_park",
                     name = f'{args.model_name}_{args.dataset}_lr_{args.lr}_seed_{args.seed}',
                     reinit=True
@@ -157,8 +145,12 @@ class Test_training(nn.Module):
                 }
 
         # roberta.embeddings freeze
-        for param in self.model.roberta.embeddings.parameters():
-            param.requires_grad = False
+        if args.model_name == 'roberta-large':
+            for param in self.model.roberta.embeddings.parameters():
+                param.requires_grad = False
+        if args.model_name == 'bert-large':
+            for param in self.model.bert.embeddings.parameters():
+                param.requires_grad = False
 
         set_seed(args.seed)
         
@@ -221,7 +213,7 @@ class Test_training(nn.Module):
                 # early_stopping는 validation loss가 감소하였는지 확인이 필요하며,
                 # 만약 감소하였을경우 현제 모델을 checkpoint로 만든다.
 
-                early_stopping(self.model, eval_acc)
+                early_stopping(self.model, eval_acc, args)
                 if early_stopping.early_stop:
                     print("Early stopping")
                     break
@@ -301,8 +293,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=150, help='Number of epochs to train (default: 50)')
 
     parser.add_argument('--seed', type=int, default=42, help='13 | 21 | 42 | 87 | 100')
-    parser.add_argument('--model-name', type = str, default = 'roberta-large', help = 'Base model (default : roberta-large)')
-    parser.add_argument('--dataset', type = str, default = 'mnli-mm', help = "Choose the dataset")
+    parser.add_argument('--model-name', type = str, default = 'bert-large', help = 'Base model (default : roberta-large)')
+    parser.add_argument('--dataset', type = str, default = 'sst-2', help = "Choose the dataset")
     parser.add_argument('--latent-dim', type=int, default=128, help='Latent dimension n_z (default: 256)')
 
     parser.add_argument("--warmup-steps", type=int, default=0, help= "warmup steps for scheduler")
@@ -328,7 +320,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--device', type = str, default = 'cuda:1', help = 'Number of GPU')
 
-    parser.add_argument("--active-log", type=bool , default=True, help="True | False")  # wandb log를 남길지 말지 True면 남김, False면 남기지 않음
+    parser.add_argument("--active-log", type=bool , default=False, help="True | False")  # wandb log를 남길지 말지 True면 남김, False면 남기지 않음
     parser.add_argument('--data-augmentation', type = bool, default = True, help = 'Data Augmentation or not [True, False]]')
     parser.add_argument("--greedy", type=bool , default = True, help="True | False")  # greedy search를 할지 말지 True면 greedy search, False면 beam search
 
@@ -336,10 +328,10 @@ if __name__ == '__main__':
     parser.add_argument('--vq-model-path', type = str, default = f'{os.getcwd()}/cache_VQ_model_ver2', help = 'vq_model path [model_file | model_file]')
     parser.add_argument('--data-path', type = str, default = f'{os.getcwd()}/task_dataset', help = 'data path [data_file | data_file]')
 
-    parser.add_argument('--save-model', type = str, default = f'{os.getcwd()}/checkpoint_roberta_model', help = 'save model path [model_file | model_file]')
-    parser.add_argument('--save-test-result', type = str, default = f'{os.getcwd()}/test_result_ver3', help = 'save model path [model_file | model_file]')
-    parser.add_argument('--save-conventional-test-result', type = str, default = f'{os.getcwd()}/test_convention_result_ver3', help = 'save model path [model_file | model_file]')
+    parser.add_argument('--save-model', type = str, default = f'{os.getcwd()}/checkpoint_bert_model', help = 'save model path [model_file | model_file]')
+    parser.add_argument('--save-test-result', type = str, default = f'{os.getcwd()}/test_result_bert_ver1', help = 'save model path [model_file | model_file]')
+    parser.add_argument('--save-conventional-test-result', type = str, default = f'{os.getcwd()}/test_convention_result_bert_ver1', help = 'save model path [model_file | model_file]')
     
     args = parser.parse_args()
 
-    greedy_search(args.greedy, args, 'Finetuning_RoBERTa', Test_training)
+    greedy_search(args.greedy, args, 'Finetuning', Test_training)

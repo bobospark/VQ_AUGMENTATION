@@ -53,60 +53,60 @@ class Swish(nn.Module):
 
 
 
-class UpSampleBlock(nn.Module):  # Single convolution layer 
-    def __init__(self, channels):
-        super(UpSampleBlock, self).__init__()
-        self.conv = nn.Embedding(channels, channels, 3, 1, 1)
+# class UpSampleBlock(nn.Module):  # Single convolution layer 
+#     def __init__(self, channels):
+#         super(UpSampleBlock, self).__init__()
+#         self.conv = nn.Embedding(channels, channels, 3, 1, 1)
         
-    def forward(self, x):
+#     def forward(self, x):
         
-        x = F.interpolate(x, scale_factor = 2.0) 
+#         x = F.interpolate(x, scale_factor = 2.0) 
 
-        return self.conv(x)
+#         return self.conv(x)
 
-class DownSampleBlock(nn.Module):  # Reverse of the up sample blocks 
-    def __init__(self, channels):
-        super(DownSampleBlock, self).__init__()
-        self.conv = nn.Conv2d(channels, channels, 3, 2, 0)
+# class DownSampleBlock(nn.Module):  # Reverse of the up sample blocks 
+#     def __init__(self, channels):
+#         super(DownSampleBlock, self).__init__()
+#         self.conv = nn.Conv2d(channels, channels, 3, 2, 0)
         
-    def forward(self, x):
-        pad = (0, 1, 0, 1)
-        x = F.pad(x, pad, mode = "constant", value = 0)
-        return self.conv(x)
+#     def forward(self, x):
+#         pad = (0, 1, 0, 1)
+#         x = F.pad(x, pad, mode = "constant", value = 0)
+#         return self.conv(x)
     
-# Sort of the Attention Mechanism
-class NonLocalBlock(nn.Module):
-    def __init__(self, d_model):
-        super(NonLocalBlock, self).__init__()
-        self.d_model = d_model
+# # Sort of the Attention Mechanism
+# class NonLocalBlock(nn.Module):
+#     def __init__(self, d_model):
+#         super(NonLocalBlock, self).__init__()
+#         self.d_model = d_model
         
-        self.gn = BatchNorm(d_model)
-        self.q = nn.Linear(d_model, d_model)
-        self.k = nn.Linear(d_model, d_model)
-        self.v = nn.Linear(d_model, d_model)
-        self.proj_out = nn.Linear(d_model, d_model)
+#         self.gn = BatchNorm(d_model)
+#         self.q = nn.Linear(d_model, d_model)
+#         self.k = nn.Linear(d_model, d_model)
+#         self.v = nn.Linear(d_model, d_model)
+#         self.proj_out = nn.Linear(d_model, d_model)
         
-    def forward(self, x):
-        h_ = self.gn(x)
-        q = self.q(h_)
-        k = self.k(h_)
-        v = self.v(h_)
+#     def forward(self, x):
+#         h_ = self.gn(x)
+#         q = self.q(h_)
+#         k = self.k(h_)
+#         v = self.v(h_)
         
-        b, c, h, w = q.shape
+#         b, c, h, w = q.shape
         
-        q = q.reshape(b, c, h*w)
-        q = q.permute(0, 2, 1)#.to("cpu")
-        k = k.reshape(b, c, h*w)#.to("cpu")
-        v = v.reshape(b, c, h*w)#.to("cpu")
+#         q = q.reshape(b, c, h*w)
+#         q = q.permute(0, 2, 1)#.to("cpu")
+#         k = k.reshape(b, c, h*w)#.to("cpu")
+#         v = v.reshape(b, c, h*w)#.to("cpu")
   
-        attn = torch.bmm(q, k)  # q*k  왜 여기서 차원 계산 오류가 뜨는거야 시부레...
+#         attn = torch.bmm(q, k)  # q*k  왜 여기서 차원 계산 오류가 뜨는거야 시부레...
 
-        attn = attn * (int(c)**(-0.5))  # c is dimension
-        attn = F.softmax(attn, dim = 2)
-        attn = attn.permute(0, 2, 1)
+#         attn = attn * (int(c)**(-0.5))  # c is dimension
+#         attn = F.softmax(attn, dim = 2)
+#         attn = attn.permute(0, 2, 1)
         
-        A = torch.bmm(v, attn)
-        A = A.reshape(b, c, h, w)
-        # A = A .to("cuda")
-        return x + A
+#         A = torch.bmm(v, attn)
+#         A = A.reshape(b, c, h, w)
+#         # A = A .to("cuda")
+#         return x + A
     

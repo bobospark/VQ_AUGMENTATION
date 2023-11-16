@@ -8,7 +8,7 @@ from make_augmentation import MakeAugmentation
 from Few_Shot_data import Few_Shot
 import pickle
 
-class make_roberta_dataset(Dataset):  
+class make_dataset(Dataset):  
     def __init__(self, args, train_eval = None):
         
         self.args = args
@@ -19,7 +19,6 @@ class make_roberta_dataset(Dataset):
             real_embedding, fake_embedding, attention_mask, labels = self.load_data.forward(args, train_eval = self.train_eval)
         else:  
             real_embedding, _ ,attention_mask, labels  = self.load_data.forward(args, train_eval = self.train_eval)
-            # make_roberta_dataset.indexes = indexes
 
         if args.data_augmentation :
             if self.train_eval == 'train':
@@ -28,8 +27,6 @@ class make_roberta_dataset(Dataset):
                 self.total_attention_mask = torch.cat([attention_mask, attention_mask], dim=0)
                 self.total_labels = labels + labels
                 
-                # self.data_ = {'inputs_embeds': self.total_embedding, 'attention_mask': self.total_attention_mask}
-                # self.data_label = self.total_labels
 
             if not self.train_eval == 'train':
                 if train_eval == 'validation':

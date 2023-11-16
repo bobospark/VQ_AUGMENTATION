@@ -19,11 +19,10 @@ class VQAugmentation(nn.Module):
         self.encoder = Encoder(args).to(device = args.device)
         self.decoder = Decoder(args).to(device = args.device)
         self.codebook = Codebook(args).to(device = args.device)
-        self.quant = nn.Embedding(args.latent_dim, 1).to(device = args.device)  # 이거랑 밑에꺼의 의미를 모르겠음
+        self.quant = nn.Embedding(args.latent_dim, 1).to(device = args.device)  
         self.post_quant = nn.Embedding(args.latent_dim, 1).to(device = args.device)
             
-    def forward(self, embedded_data = None):  #  attention_mask = None, labels = None
-
+    def forward(self, embedded_data = None): 
         encoded_text = self.encoder(embedded_data)
         codebook_mapping, codebook_indices, q_loss = self.codebook(encoded_text)
         decoded_text = self.decoder(codebook_mapping)
@@ -63,3 +62,6 @@ class VQAugmentation(nn.Module):
         
     def load_checkpoint(self,path):
         self.load_state_dict(torch.load(path))
+
+
+

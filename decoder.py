@@ -3,7 +3,7 @@ VQ-Augmentation의 Decoder 코드
 '''
 
 import torch.nn as nn
-from helper import ResidualBlock, NonLocalBlock, DownSampleBlock, BatchNorm, Swish
+from helper import ResidualBlock
 import numpy as np
 import torch
 
@@ -12,7 +12,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.args = args
         torch.manual_seed(args.seed)
-        channels = [128, 256, 512, 1024]  # 원래는 [1024, 512, 256, 128]였음
+        channels = [128, 256, 512, 1024]  
         
         layers = []
         layers.append(ResidualBlock(128, 128, normalize = False))
@@ -21,18 +21,12 @@ class Decoder(nn.Module):
             out_channels = channels[i+1]
             layers.append(ResidualBlock(in_channels, out_channels))
 
-
-
         layers.append(nn.Linear(1024, 1024))        
-        # layers.append(Swish())  # 원래는 Swish()였음
-        # layers.append(nn.Embedding(channels[-1], args.latent_dim, 3, 1, 1))
         
         self.model = nn.Sequential(*layers)
                 
                 
-    def forward(self, x):
-        # print(x.size())
-        text_hallucinated = self.model(x)
-        # text_hallucinated = text_hallucinated.view(text_hallucinated.size(0), *self.args.text_shape)
+    def forward(self, encoded_input):
+        text_hallucinated = self.model(encoded_input)
 
         return text_hallucinated

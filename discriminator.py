@@ -12,8 +12,6 @@ class Discriminator(nn.Module):
         
         torch.manual_seed(args.seed)
 
-        # self.label_embedding = nn.Embedding(args.num_classes, args.num_classes)
-
         # Copied from cgan.py
         self.model = nn.Sequential(
             nn.Linear(args.text_shape, 512),
@@ -25,7 +23,6 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, embedded_text):
-        # Concatenate label embedding and image to produce input
-        d_in = embedded_text # torch.cat((embedded_text.view(embedded_text.size(0), -1)), -1)  # , self.label_embedding(labels)
-        validity = self.model(d_in)
+        validity = self.model(embedded_text)
+
         return validity

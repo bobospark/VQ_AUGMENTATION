@@ -11,14 +11,12 @@ Token화 된 데이터셋을 Few-shot으로 불러오는 코드
 
 
 import random
-from random import seed
-from random import randint
 from torch.utils.data import Dataset
 
 import pickle
 import torch
 import numpy as np
-from dataset_processor import processors_mapping, num_labels_mapping, output_modes_mapping, compute_metrics_mapping  #  median_mapping
+from dataset_processor import processors_mapping
 # from tokenizing import Set_Dataset_to_Token
 from torch.utils.data.dataloader import DataLoader
 
@@ -90,12 +88,6 @@ class _Set_Dataset_to_Token():
 
     def __len__(self):
         return len(self.data)   
-    
-    # def __getitem__(self, idx):
-    #     text, label = self.data[idx]
-    #     input_ids = self.tokenizer.encode(text, add_special_tokens=True)
-    #     attention_mask = [1] * len(input_ids)
-    #     return torch.tensor(input_ids), torch.tensor(attention_mask), torch.tensor(label)
 
 
 
@@ -105,7 +97,6 @@ class Testset_split(Dataset):
         self.load_data = _Set_Dataset_to_Token(args)  # test_dataset2 -> Mydataset
 
         # Set dataset
-
         data_file_path = '%s/%s_dataset.pkl'%(args.data_path, args.dataset)
         with open(data_file_path, "rb") as f:
             self.dataset = pickle.load(f)

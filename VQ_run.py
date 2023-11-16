@@ -35,33 +35,6 @@ from utils import greedy_search
 # ----------
 #  Training 1
 # ----------
-def compute_gradient_penalty(D, real_samples, fake_samples): # , labels
-    """Calculates the gradient penalty loss for WGAN GP.
-       Warning: It doesn't compute the gradient w.r.t the labels, only w.r.t
-       the interpolated real and fake samples, as in the WGAN GP paper.
-    """
-    Tensor = torch.cuda.FloatTensor 
-    # Random weight term for interpolation between real and fake samples
-    alpha = Tensor(np.random.random((real_samples.size(0), 1)))
-    # labels = LongTensor(labels)
-    # Get random interpolation between real and fake samples
-    interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
-    d_interpolates = D(interpolates)  # ,labels
-    fake = Tensor(real_samples.shape[0], 1).fill_(1.0)
-    fake.requires_grad = False
-    # Get gradient w.r.t. interpolates
-    gradients = autograd.grad(
-        outputs=d_interpolates,
-        inputs=interpolates,
-        grad_outputs=fake,
-        create_graph=True,
-        retain_graph=True,
-        only_inputs=True,
-    )
-    gradients = gradients[0].view(gradients[0].size(0), -1)
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-    return gradient_penalty
-
 
 class train_VQAugmentation(nn.Module):
     def __init__(self, args):
@@ -76,12 +49,11 @@ class train_VQAugmentation(nn.Module):
         # Loss weight for gradient penalty
         self.lambda_gp = 100   #### original default is 10
         # self.prepare_training()  # 저장공간 만들기
-        with open(f'{args.data_path}/roberta_large_embeddings.pkl', "rb") as f:
+        with open(f'{args.data_path}/{args.model_name}_embeddings.pkl', "rb") as f:
             self.data = pickle.load(f)
 
         self.train(args)
 
-            
     def configure_optimizers(self, args): 
         vq_lr = args.vq_lr
         opt_vq = torch.optim.Adam(
@@ -98,15 +70,9 @@ class train_VQAugmentation(nn.Module):
     def train(self, args):
 
         seed_everything(args)
-        # train_dataset = EmbeddingDataset(args, 'train')  # data_name = 'sst-2' || 'cola' || 'mrpc' || 'sst-5' || 'rte' || 'qnli' || 'qqp' || 'mnli' || 'mnli-mm' || 'wnli'
-        
+
         dataloader = DataLoader(self.data, batch_size=args.batch_size, shuffle=True,)  
 
-        # accelerator = Accelerator()
-        # self.model = self.model.to(device = args.device)
-        # train_dataset, self.model, self.discriminator, self.opt_vq, self.opt_disc = accelerator.prepare(
-        #     embeddings_set, self.model, self.discriminator, self.opt_vq, self.opt_disc
-        # )
         self.model = self.model.to(device = args.device)
         self.discriminator = self.discriminator.to(device = args.device)
 
@@ -115,10 +81,8 @@ class train_VQAugmentation(nn.Module):
         self.lambda_gp = 100
 
         self.criterion = torch.nn.CrossEntropyLoss()
-        # self.criterion = nn.BCELoss()
 
         Tensor = torch.cuda.FloatTensor 
-        LongTensor = torch.cuda.LongTensor
 
         # start a new wandb run to track this script
         if args.active_log:
@@ -146,12 +110,10 @@ class train_VQAugmentation(nn.Module):
 
         for epoch in range(args.n_epochs):
             with tqdm(range(len(dataloader))) as pbar:
-                for i, embs in zip(pbar, dataloader):  # datae들이 shuffle되어서 나옴
+                for i, embs in zip(pbar, dataloader): 
 
                     embs = embs.to(device = args.device)
-                    embs = embs.type(Tensor)  # shape = [8, 128, 1024]
-
-                    # Token별로 VQGAN을 통과시킨다.
+                    embs = embs.type(Tensor) 
 
                     # Sample noise and labels as generator input
                     # 여기서부터 모델 seed 고정 필요. 
@@ -165,29 +127,7 @@ class train_VQAugmentation(nn.Module):
 
                     disc_factor = self.model.adopt_weight(args.disc_factor, epoch*steps_per_epoch + i, threshold = args.disc_start)  # 많이 진행되면 gan_loss를 0으로 만들기 위한 factor
 
-                    # VQ_GAN 에서 Discriminator에 쓰이는 Loss
-                    # d_loss_real = torch.mean(F.relu(1. - disc_real))
-                    # d_loss_fake = torch.mean(F.relu(1. + disc_fake))
-                    # disc_loss =  disc_factor * 0.5 * (d_loss_real + d_loss_fake)  # discriminator의 loss
-
-                    # 일반 GAN에서 Discriminator에 쓰이는 Loss  
-                    # gradient_penalty = compute_gradient_penalty(
-                    #             self.discriminator, embs, decoded_text,
-                    #             )
-                    # Adversarial loss
-
-                    # d_loss_real = disc_real
-                    # d_loss_fake = disc_fake
-                    
                     disc_loss = -torch.mean(disc_real) + torch.mean(disc_fake)  # WGAN Loss
-                    
-
-                    # d_loss_real = self.criterion(disc_real.reshape(1,-1), torch.ones_like(disc_real.reshape(1,-1)))
-                    # d_loss_fake = self.criterion(disc_fake.reshape(1,-1), torch.zeros_like(disc_fake.reshape(1,-1)))
-
-                    # disc_loss = (d_loss_real + d_loss_fake)/(args.batch_size * 2)
-                    # disc_loss = torch.mean(d_loss_real) + torch.mean(d_loss_fake)  #+ self.lambda_gp * gradient_penalty
-
 
                     self.opt_disc.zero_grad()  # discriminator의 gradient를 0으로 초기화
                     disc_loss.backward(retain_graph = True)  # discriminator의 loss를 backpropagation
@@ -202,15 +142,10 @@ class train_VQAugmentation(nn.Module):
 
                         disc_fake = self.discriminator(decoded_text)
 
-                        # mse_loss = ((embs.mean(dim = 1) - decoded_text.mean(dim = 1))**2).mean()
                         rec_loss = torch.abs(embs - decoded_text).mean()
-                        # mse_rec_loss = args.mse_loss_factor * mse_loss + args.rec_loss_factor * rec_loss
 
-                        # lambda_ = self.model.calculate_lambda(mse_loss, g_loss)
-                        # vq_loss = mse_rec_loss + q_loss + disc_factor *  g_loss  # generator의 loss  # lambda_ *
                         cosine_loss = (1- F.cosine_similarity(embs, decoded_text)).mean()
-                        # rec_loss = ((embs.mean(dim = 1) - decoded_text.mean(dim = 1))**2).mean()
-                        
+
                         cosine_rec_loss =  args.rec_loss_factor * rec_loss  + args.cosine_loss_factor * (cosine_loss) 
 
                         g_loss = -torch.mean(disc_fake)  # generator의 loss. GAN의 loss와 반대로 만들어야 한다.
@@ -222,7 +157,6 @@ class train_VQAugmentation(nn.Module):
 
                     pbar.set_postfix(
                         Epoch = f'{epoch+1}/{args.n_epochs}',
-                        # mse_res_Loss = np.round(mse_rec_loss.cpu().detach().numpy().item(), 5),  # 실제 embeddeing과 생성된 embedding의 차이
                         cosie_loss = np.round(cosine_loss.cpu().detach().numpy().item(), 5),
                         q_loss = np.round(q_loss.cpu().detach().numpy().item(), 5),
                         g_loss = np.round(g_loss.cpu().detach().numpy().item(), 5),
@@ -240,9 +174,7 @@ class train_VQAugmentation(nn.Module):
                                    "cosine_rec_loss" :cosine_rec_loss,
                                    "q_loss": q_loss 
                                    })
-                        # wandb.log({"VQ_loss": vq_loss, "DISC_loss": disc_loss, "g_loss" : g_loss, "mse_res_loss" : mse_rec_loss, "q_loss" : q_loss, "lambda" : lambda_})
 
-        
             # Save the model
             if not os.path.exists(f'/workspace/cache_VQ_model_ver2'):
                 os.mkdir(f'/workspace/cache_VQ_model_ver2')
@@ -265,19 +197,15 @@ if __name__ == '__main__':
     parser.add_argument("--disc-start", type=int, default=50, help="epoch to start discriminator training (default : 0)")
     parser.add_argument("--disc-factor", type=float, default=1.0, help="Discriminator loss scalar (default : 0.1)")
     parser.add_argument("--rec-loss-factor", type=float, default=1.0, help="rec loss scalar (default : 1)")
-    # parser.add_argument("--mse-loss-factor", type=float, default=1.0, help="mse loss scalar (default : 1)")
     parser.add_argument("--cosine-loss-factor", type=float, default=1.0, help="mse loss scalar (default : 1)")
     parser.add_argument("--n-critic", type=int, default=3, help="number of training steps for discriminator per iter")
-    # parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")  # cWGAN 용
-
-    # parser.add_argument("--sample-interval", type=int, default=400, help="interval betwen image samples")
     
     parser.add_argument("--few-shot-type", type=str, default='finetune', help="finetune | prompt")
     parser.add_argument("--seed", type=int, default=42, help="13 | 21 | 42 | 87 | 100")
 
     parser.add_argument("--embedded-size", type=int, default=1024, help="input length for Transformer, i.e. 128, 256, 512")
 
-    parser.add_argument("--model-name", type=str, default='roberta-large', help="roberta-large | bert-large-cased")
+    parser.add_argument("--model-name", type=str, default='bert-large', help="roberta-large | bert-large-uncased")
     parser.add_argument("--device", type=str, default='cuda', help="cuda | cpu")
     
     parser.add_argument("--text-shape", type=int, default=1024, help="1024 | 2048 | 4096") 
@@ -285,7 +213,6 @@ if __name__ == '__main__':
     parser.add_argument("--active-log", type=bool , default=True, help="True | False")  # wandb log를 남길지 말지 True면 남김, False면 남기지 않음
     parser.add_argument("--greedy", type=bool , default=True, help="True | False")  # greedy search를 할지 말지 True면 greedy search, False면 beam search
 
-    # parser.add_argument('--model-path', type = str, default = '/workspace/model_file', help = 'model path [model_file | model_file]')
     parser.add_argument('--data-path', type = str, default = '/workspace/dataset', help = 'data path [dataset | dataset]')
 
     args = parser.parse_args()

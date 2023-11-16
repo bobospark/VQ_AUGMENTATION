@@ -20,11 +20,11 @@ class MakeAugmentation(nn.Module):
         torch.manual_seed(args.seed)
 
         # Define the path to the saved model file
-        roberta_model_file_path = '%s/%s_class_%s.pkl'%(args.model_path, args.model_name, args.num_classes)
+        LM_model_file_path = '/workspace/dataset/%s_embeddings.pkl'%(args.model_name)
 
         # Load the model from the file using pickle
-        with open(roberta_model_file_path, "rb") as f:
-            self.model_roberta = pickle.load(f).to(device = args.device)
+        with open(LM_model_file_path, "rb") as f:
+            self.LM_model = pickle.load(f).to(device = args.device)
         
         #  'mrpc', 'qqp', 'stsb', 'mnli', 'mnli-mm', 'qnli', 'rte', 'wnli', 
         if args.data_augmentation :
@@ -61,7 +61,7 @@ class MakeAugmentation(nn.Module):
             label = token[1].detach().cpu().numpy()
             
             with torch.no_grad():
-                embedded_data = self.model_roberta.get_input_embeddings()(input_ids)  # <- 이거가 다른거였음 그냥
+                embedded_data = self.LM_model[input_ids]  # <- 이거가 다른거였음 그냥
                 embeddings = embedded_data.detach().cpu().numpy()
             
             self.embeddings.append(torch.tensor(embeddings))
@@ -86,8 +86,7 @@ class MakeAugmentation(nn.Module):
                         # 단어들을 하나씩 뽑아서 학습 진행
                         for j in range(embs.shape[0]):
                             text = embs[j,:].view(1 , -1) 
-                            label = label.view(-1)
-                            decoded_text = self.model_vq(text, label)[0]  # min_encoding_indices와 q_lossㄴ는 빼고 뽑음
+                            decoded_text = self.model_vq(text)[0]  # min_encoding_indices와 q_lossㄴ는 빼고 뽑음
                             decoded_sentence.append(decoded_text)
                         augmented_data = torch.cat(decoded_sentence, dim = 0) # [67, 1024]
                         augmented_data_mixture = embs*args.rate_of_real + augmented_data*(1 - args.rate_of_real)
