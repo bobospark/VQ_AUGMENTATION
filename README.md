@@ -7,5 +7,5 @@ VQ-GAN을 활용한 Text Data의 Embedding Data 확장
 
 ---
 2. VQ-Augmentation 활용 전체 프로세스
+![Figure 1](https://github.com/bobospark/VQ_AUGMENTATION/assets/118425851/a0ab9969-52ec-41f1-8202-3e7097bebfa0)
 
-![Figure 1](https://github.com/bobospark/VQ_AUGMENTATION/assets/118425851/92373ca5-240b-4821-9025-2b1a54cc1de0)
